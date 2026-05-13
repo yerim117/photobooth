@@ -127,7 +127,7 @@ export default function SharePage() {
           style={{
             position: "absolute",
             top: 100, left: 8, width: 285,
-            backgroundImage: "url('/photocard-color.jpg')",
+            backgroundImage: "url('/photocard-color.JPG')",
             backgroundSize: "cover", backgroundPosition: "center",
             borderRadius: 10, padding: "12px 12px 8px",
             transform: front === "photo"

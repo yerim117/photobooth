@@ -54,7 +54,7 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
       const compressed = await Promise.all(photos.map(compressPhoto));
       const payload = JSON.stringify({ photos: compressed, to, message, senderName });
       const encoded = LZString.compressToEncodedURIComponent(payload);
-      const url = `${window.location.origin}/share#${encoded}`;
+      const url = `${window.location.origin}/share/#${encoded}`;
       await navigator.clipboard.writeText(url);
       alert("링크가 복사됐어요! 원하는 곳에 붙여넣기 해주세요 🔗");
     } catch (e) {
@@ -199,7 +199,7 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
             top: 100,
             left: 8,
             width: 285,
-            backgroundImage: "url('/photocard-color.jpg')",
+            backgroundImage: "url('/photocard-color.JPG')",
             backgroundSize: "cover",
             backgroundPosition: "center",
             borderRadius: 10,
