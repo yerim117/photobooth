@@ -140,7 +140,7 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
           <span
             key={countKey}
             className="count-anim"
-            style={{ fontSize: "clamp(140px, 25vw, 200px)", color: "rgba(255, 0, 123, 0.9)", fontStyle: "italic", lineHeight: 1 }}
+            style={{ fontSize: "clamp(140px, 25vw, 200px)", color: "rgba(247, 173, 209, 0.9)", fontStyle: "italic", lineHeight: 1 }}
           >
             {count}
           </span>
@@ -150,14 +150,14 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
       {/* 준비 중 */}
       {phase === "init" && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20 }}>
-          <p style={{ color: "rgba(255, 0, 123, 0.9)", fontSize: 18 }}>Ready...</p>
+          <p style={{ color: "rgba(247, 173, 209, 0.9)", fontSize: 18 }}>Ready...</p>
         </div>
       )}
 
       {/* 다음 사진 준비 안내 */}
       {phase === "pause" && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20 }}>
-          <p style={{ color: "rgba(255, 0, 123, 0.9)", fontSize: 24, fontStyle: "italic" }}>
+          <p style={{ color: "rgba(247, 173, 209, 0.9)", fontSize: 24, fontStyle: "italic" }}>
             Next!
           </p>
         </div>
@@ -166,7 +166,7 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
       {/* 촬영 진행 표시 (1/2, 2/2) */}
       {(phase === "countdown" || phase === "pause") && (
         <div style={{ position: "absolute", top: 24, left: 0, right: 0, display: "flex", justifyContent: "center", zIndex: 20 }}>
-          <span style={{ color: "rgba(255, 0, 123, 0.9)", fontSize: 14, letterSpacing: "0.2em" }}>
+          <span style={{ color: "rgba(247, 173, 209, 0.9)", fontSize: 14, letterSpacing: "0.2em" }}>
             {shotIndex + 1} / 2
           </span>
         </div>

@@ -9,10 +9,8 @@
 :root {
   --red:      #C84040;
   --gold:     #EDD98A;
-  --card-bg:  #F2EDE4;
+  --card-bg:  rgba(247, 173, 209, 0.9);
   --msg-bg:   #E8E4DC;
-  --gingham-cream: #FAF5E4;
-  --gingham-blue:  rgba(176, 215, 235, 0.55);
   --underline: #666;
 }
 

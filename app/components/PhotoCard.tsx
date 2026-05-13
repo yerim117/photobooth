@@ -168,7 +168,7 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
             <p
               style={{
                 fontSize: 19,
-                color: "rgba(255, 0, 123, 0.9)",
+                color: "rgba(247, 173, 209, 0.9)",
                 lineHeight: 1.7,
                 whiteSpace: "pre-wrap",
                 textAlign: "center",
@@ -256,7 +256,7 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
           <p
             style={{
               fontSize: 24,
-              color: "rgba(255, 0, 123, 0.9)",
+              color: "rgba(247, 173, 209, 0.9)",
               textAlign: "center",
               padding: "2px 0 4px",
             }}
@@ -279,9 +279,9 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
         }}
       >
         {[
-          { label: "💾 저장하기", onClick: downloadStrip, disabled: false },
-          { label: linking ? "🔗 링크 생성 중…" : "🔗 링크 공유", onClick: shareLink, disabled: linking },
-          { label: "🔄 다시 찍기", onClick: onRetake, disabled: false },
+          { label: "save photo", onClick: downloadStrip, disabled: false },
+          { label: linking ? "🔗 링크 생성 중…" : "share link", onClick: shareLink, disabled: linking },
+          { label: "retake photo", onClick: onRetake, disabled: false },
         ].map(({ label, onClick, disabled }) => (
           <button
             key={label}
@@ -289,11 +289,11 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
             disabled={disabled}
             style={{
               padding: "10px 20px",
-              background: "var(--card-bg)",
-              border: "1.5px solid var(--gold)",
+              background: "var(--white)",
+              border: "1.5px solid var(--brown)",
               borderRadius: 8,
               fontSize: 16,
-              color: "#333",
+              color: "rgba(247, 173, 209, 0.9)",
               cursor: disabled ? "not-allowed" : "pointer",
               opacity: disabled ? 0.6 : 1,
               boxShadow: "0 2px 6px rgba(0,0,0,0.08)",

@@ -33,7 +33,7 @@ export default function PrintingScreen({ photos, onDone }: PrintingScreenProps) 
       <p
         style={{
           fontSize: 34,
-          color: "rgba(255, 0, 123, 0.9)",
+          color: "rgba(247, 173, 209, 0.9)",
           zIndex: 1,
         }}
       >
@@ -46,10 +46,10 @@ export default function PrintingScreen({ photos, onDone }: PrintingScreenProps) 
           display: "flex",
           flexDirection: "column",
           gap: 8,
-          border: "6px solid var(--gold)",
+          border: "6px solid rgba(247, 173, 209, 0.9)",
           padding: 12,
           borderRadius: 8,
-          background: "#fff",
+          background: "#f5ebbf",
           zIndex: 1,
           boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
         }}
