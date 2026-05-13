@@ -158,7 +158,7 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
             <p
               style={{
                 fontSize: 19,
-                color: "var(--brown)",
+                color: "var(--card-bg)",
               }}
             >
               To. {to}
@@ -181,7 +181,7 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
             <p
               style={{
                 fontSize: 17,
-                color: "var(--brown)",
+                color: "var(--card-bg)",
                 textAlign: "right",
                 width: "100%",
               }}
