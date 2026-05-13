@@ -18,7 +18,7 @@ export default function SharePage() {
 
   useEffect(() => {
     try {
-      const hash = window.location.hash.slice(1); // '#' 제거
+      const hash = window.location.hash.slice(1); 
       if (!hash) { setError(true); return; }
       const decompressed = LZString.decompressFromEncodedURIComponent(hash);
       if (!decompressed) { setError(true); return; }
@@ -37,7 +37,7 @@ export default function SharePage() {
         gap: 12, position: "relative",
       }}>
         <Background />
-        <p style={{ fontSize: 36, color: "var(--red)" }}>
+        <p style={{ fontSize: 36, color: "var(--card-bg)" }}>
           링크가 유효하지 않아요 💌
         </p>
       </div>
@@ -52,7 +52,7 @@ export default function SharePage() {
         position: "relative",
       }}>
         <Background />
-        <p style={{ fontSize: 28, color: "var(--red)" }}>
+        <p style={{ fontSize: 28, color: "var(--card-bg)" }}>
           loading...
         </p>
       </div>
@@ -99,13 +99,13 @@ export default function SharePage() {
           }}
         >
           {to && (
-            <p style={{ fontSize: 19, color: "#555" }}>
+            <p style={{ fontSize: 19, color: "#342323" }}>
               To. {to}
             </p>
           )}
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <p style={{
-              fontSize: 19, color: "var(--red)",
+              fontSize: 19, color: "var(--card-bg)",
               lineHeight: 1.7, whiteSpace: "pre-wrap", textAlign: "center",
             }}>
               {message || "메시지가 없어요."}
@@ -113,7 +113,7 @@ export default function SharePage() {
           </div>
           {senderName && (
             <p style={{
-              fontSize: 17, color: "#777",
+              fontSize: 17, color: "#342323",
               textAlign: "right", width: "100%",
             }}>
               From. {senderName}
@@ -163,17 +163,17 @@ export default function SharePage() {
             </div>
           ))}
           <p style={{
-            fontSize: 24, color: "var(--red)",
+            fontSize: 24, color: "var(--card-bg)",
             textAlign: "center", padding: "2px 0 4px",
           }}>
-            With love
+            ✨ To You ✨
           </p>
         </div>
       </div>
 
       {/* 안내 문구 */}
       <p style={{
-        fontSize: 20, color: "var(--red)",
+        fontSize: 20, color: "var(--card-bg)",
         opacity: 0.7, zIndex: 3,
       }}>
         tap to flip 💌
