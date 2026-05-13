@@ -95,7 +95,7 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
           />
         </div>
 
-        {/* Message */}
+       {/* Message */}
         <div style={fieldWrap}>
           <label style={labelStyle}>Message :</label>
           <textarea
@@ -107,8 +107,7 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
             rows={2}
             style={{
               ...inputStyle,
-              resize: "none",
-              lineHeight: 1.7,
+              resize: "none"
             }}
           />
         </div>
