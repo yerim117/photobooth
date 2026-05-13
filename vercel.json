@@ -1,6 +1,0 @@
-{
-  "serverless": {
-    "memory": 1024
-  },
-  "public": true
-}
