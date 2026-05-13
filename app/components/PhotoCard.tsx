@@ -290,7 +290,7 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
             style={{
               padding: "10px 20px",
               background: "var(--white)",
-              border: "1.5px solid var(--brown)",
+              border: "1.5px solid var(--card-bg)",
               borderRadius: 8,
               fontSize: 16,
               color: "rgba(247, 173, 209, 0.9)",
