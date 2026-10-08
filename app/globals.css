@@ -8,30 +8,11 @@
 
 :root {
   --red:      #C84040;
+  --white:    #ffffff;
   --gold:     #EDD98A;
   --card-bg:  rgba(247, 173, 209, 0.9);
   --msg-bg:   #E8E4DC;
   --underline: #666;
-}
-
-/* ── 깅엄 배경 ── */
-.gingham {
-  background-color: var(--gingham-cream);
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0px,
-      transparent 60px,
-      var(--gingham-blue) 60px,
-      var(--gingham-blue) 120px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0px,
-      transparent 60px,
-      var(--gingham-blue) 60px,
-      var(--gingham-blue) 120px
-    );
 }
 
 /* ── CSS 별 ── */

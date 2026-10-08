@@ -83,10 +83,11 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
 
         {/* To */}
         <div style={fieldWrap}>
-          <label style={labelStyle}>To :</label>
+          <label htmlFor="intro-to" style={labelStyle}>To :</label>
           <input
             type="text"
             className="cursive-input"
+            id="intro-to"
             value={to}
             onChange={(e) => setTo(e.target.value)}
             placeholder="Enter recipient name"
@@ -95,11 +96,12 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
           />
         </div>
 
-       {/* Message */}
+        {/* Message */}
         <div style={fieldWrap}>
-          <label style={labelStyle}>Message :</label>
+          <label htmlFor="intro-message" style={labelStyle}>Message :</label>
           <textarea
             className="cursive-input"
+            id="intro-message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Type your message..."
@@ -114,10 +116,11 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
 
         {/* from */}
         <div style={{ ...fieldWrap, marginBottom: 0 }}>
-          <label style={labelStyle}>from :</label>
+          <label htmlFor="intro-from" style={labelStyle}>from :</label>
           <input
             type="text"
             className="cursive-input"
+            id="intro-from"
             value={senderName}
             onChange={(e) => setSenderName(e.target.value)}
             placeholder="Enter your name"

@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from "react";
 import html2canvas from "html2canvas";
-import LZString from "lz-string";
 import Background from "./Background";
 
 interface PhotoCardProps {
@@ -13,93 +12,133 @@ interface PhotoCardProps {
   onRetake: () => void;
 }
 
+// ── 사진 압축 (URL 공유용)
+const compressPhoto = (dataUrl: string): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 480;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const ctx = c.getContext("2d");
+      if (!ctx) { reject(new Error("canvas context 없음")); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL("image/jpeg", 0.45));
+    };
+    img.onerror = () => reject(new Error("이미지 로드 실패"));
+    img.src = dataUrl;
+  });
+
+// ── Clipboard API를 못 쓰는 환경(인앱 브라우저, http 등)용 동기 복사
+const copyWithExecCommand = (text: string): boolean => {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.top = "0";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length); // iOS Safari는 select()만으로 선택되지 않음
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  return ok;
+};
+
 export default function PhotoCard({ photos, to, message, senderName, onRetake }: PhotoCardProps) {
-  const [sharing, setSharing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [front, setFront] = useState<"photo" | "letter">("photo");
   const captureWrapperRef = useRef<HTMLDivElement>(null);
 
   // ── 포토카드 디자인 그대로 캡처 (래퍼 기준으로 캡처해 회전 잘림 방지)
+  // allowTaint를 켜면 캔버스가 오염돼 toDataURL이 SecurityError를 던질 수 있으므로 사용하지 않음
   const captureCard = useCallback(async (): Promise<HTMLCanvasElement> => {
     if (!captureWrapperRef.current) throw new Error("ref 없음");
     return await html2canvas(captureWrapperRef.current, {
       backgroundColor: "#FAF5E4",
       scale: 2,
       useCORS: true,
-      allowTaint: true,
       logging: false,
     });
   }, []);
 
-  // ── 사진 압축 (URL 공유용)
-  const compressPhoto = (dataUrl: string): Promise<string> =>
-    new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 480;
-        let w = img.width, h = img.height;
-        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-        const c = document.createElement("canvas");
-        c.width = w; c.height = h;
-        c.getContext("2d")!.drawImage(img, 0, 0, w, h);
-        resolve(c.toDataURL("image/jpeg", 0.45));
-      };
-      img.src = dataUrl;
-    });
+  // ── 링크 공유 (2단계)
+  // 1) 첫 탭: 사진을 서버(Vercel Blob)에 올리고 짧은 링크 발급
+  // 2) 두 번째 탭: 공유 시트/복사 실행
+  // 모바일 브라우저는 탭 직후에만 공유·클립보드 API를 허용하므로, 업로드를 기다린 뒤가 아니라
+  // 새 탭(사용자 제스처) 안에서 바로 호출해야 함.
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  // ── 링크 공유
-  const [linking, setLinking] = useState(false);
-  const shareLink = async () => {
-    setLinking(true);
+  const createLink = async () => {
+    setUploading(true);
     try {
-      const compressed = await Promise.all(photos.map(compressPhoto));
-      const payload = JSON.stringify({ photos: compressed, to, message, senderName });
-      const encoded = LZString.compressToEncodedURIComponent(payload);
-      const url = `${window.location.origin}/share/#${encoded}`;
-      await navigator.clipboard.writeText(url);
-      alert("링크가 복사됐어요! 원하는 곳에 붙여넣기 해주세요 🔗");
+      const compressed = await Promise.all(photos.filter(Boolean).map(compressPhoto));
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos: compressed, to, message, senderName }),
+      });
+      if (!res.ok) throw new Error(`share API ${res.status}`);
+      const { id } = (await res.json()) as { id: string };
+      setShareUrl(`${window.location.origin}/share/${id}`);
     } catch (e) {
       console.error(e);
-      alert("링크 생성에 실패했어요.");
+      alert("링크 생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
-      setLinking(false);
+      setUploading(false);
     }
   };
 
-  // ── 저장하기
-  const downloadStrip = async () => {
-    const canvas = await captureCard();
-    const link = document.createElement("a");
-    link.download = "photocard.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+  const sendLink = async (url: string) => {
+    // 1) 모바일: 네이티브 공유 시트
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "포토카드가 도착했어요 💌", url });
+        return;
+      } catch (e) {
+        if ((e as DOMException)?.name === "AbortError") return; // 사용자가 공유 시트를 닫음
+      }
+    }
+
+    // 2) 동기 복사 — 제스처 안에서 바로 실행되므로 인앱 브라우저에서도 동작
+    if (copyWithExecCommand(url)) {
+      alert("링크가 복사됐어요! 원하는 곳에 붙여넣기 해주세요 🔗");
+      return;
+    }
+
+    // 3) Clipboard API
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("링크가 복사됐어요! 원하는 곳에 붙여넣기 해주세요 🔗");
+    } catch {
+      window.prompt("아래 링크를 복사해 주세요 🔗", url);
+    }
   };
 
-  // ── 공유하기 (3단계 폴백)
-  const shareStrip = async () => {
-    setSharing(true);
-    try {
-      const canvas = await captureCard();
-      const blob = await new Promise<Blob>((res) =>
-        canvas.toBlob((b) => res(b!), "image/png")
-      );
-      const file = new File([blob], "photocard.png", { type: "image/png" });
+  const shareLink = () => (shareUrl ? sendLink(shareUrl) : createLink());
 
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] });
-        return;
-      }
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blob }),
-      ]);
-      alert("이미지가 클립보드에 복사됐어요!\n원하는 곳에 붙여넣기 해주세요 🔗");
-    } catch {
+  // ── 저장하기
+  const downloadStrip = async () => {
+    setSaving(true);
+    try {
       const canvas = await captureCard();
       const link = document.createElement("a");
       link.download = "photocard.png";
       link.href = canvas.toDataURL("image/png");
       link.click();
+    } catch (e) {
+      console.error(e);
+      alert("이미지 저장에 실패했어요.");
     } finally {
-      setSharing(false);
+      setSaving(false);
     }
   };
 
@@ -279,12 +318,12 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
         }}
       >
         {[
-          { label: "save photo", onClick: downloadStrip, disabled: false },
-          { label: linking ? "🔗 링크 생성 중…" : "share link", onClick: shareLink, disabled: linking },
-          { label: "retake photo", onClick: onRetake, disabled: false },
-        ].map(({ label, onClick, disabled }) => (
+          { key: "save", label: saving ? "저장 중…" : "save photo", onClick: downloadStrip, disabled: saving },
+          { key: "link", label: uploading ? "🔗 링크 만드는 중…" : shareUrl ? "📤 링크 보내기" : "share link", onClick: shareLink, disabled: uploading },
+          { key: "retake", label: "retake photo", onClick: onRetake, disabled: false },
+        ].map(({ key, label, onClick, disabled }) => (
           <button
-            key={label}
+            key={key}
             onClick={onClick}
             disabled={disabled}
             style={{
