@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import Background from "./Background";
 
@@ -50,6 +50,31 @@ const copyWithExecCommand = (text: string): boolean => {
   }
   document.body.removeChild(ta);
   return ok;
+};
+
+// ── 환경 감지 (사진 저장 방식 선택용)
+const isMobile = () =>
+  /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPadOS
+
+// 카카오톡·인스타그램 등 인앱 브라우저는 다운로드/파일 공유를 막는 경우가 많음
+const isInAppBrowser = () =>
+  /KAKAOTALK|Instagram|FBAN|FBAV|Line\/|NAVER\(inapp|DaumApps|everytimeApp|; wv\)/i.test(navigator.userAgent);
+
+const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> =>
+  new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob 실패"))), "image/png")
+  );
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = url;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 };
 
 export default function PhotoCard({ photos, to, message, senderName, onRetake }: PhotoCardProps) {
@@ -126,14 +151,57 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
   const shareLink = () => (shareUrl ? sendLink(shareUrl) : createLink());
 
   // ── 저장하기
+  // 모바일은 공유 시트("이미지 저장")를 써야 하는데, 탭 직후에만 허용되므로
+  // 카드 이미지를 미리 렌더링해 둠 (카드를 뒤집으면 전환 애니메이션 후 다시 렌더링)
+  const preparedRef = useRef<{ front: string; blob: Blob } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const blob = await canvasToBlob(await captureCard());
+        if (!cancelled) preparedRef.current = { front, blob };
+      } catch (e) {
+        console.error(e);
+      }
+    }, 600); // transition(0.4s)이 끝난 뒤 캡처
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [front, captureCard]);
+
+  // 공유 시트/다운로드가 막힌 환경에서 띄우는 "길게 눌러 저장" 미리보기
+  const [preview, setPreview] = useState<{ url: string; file: File } | null>(null);
+  const closePreview = () => {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+  };
+
+  const shareFile = async (file: File): Promise<"done" | "cancelled" | "failed"> => {
+    if (!navigator.canShare?.({ files: [file] })) return "failed";
+    try {
+      await navigator.share({ files: [file] });
+      return "done";
+    } catch (e) {
+      return (e as DOMException)?.name === "AbortError" ? "cancelled" : "failed";
+    }
+  };
+
   const downloadStrip = async () => {
     setSaving(true);
     try {
-      const canvas = await captureCard();
-      const link = document.createElement("a");
-      link.download = "photocard.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
+      const ready = preparedRef.current?.front === front ? preparedRef.current.blob : null;
+      const blob = ready ?? (await canvasToBlob(await captureCard()));
+      const file = new File([blob], "photocard.png", { type: "image/png" });
+
+      if (!isMobile()) {
+        downloadBlob(blob, "photocard.png");
+        return;
+      }
+
+      // 모바일: 공유 시트 → 실패 시 길게 눌러 저장 안내
+      if (!isInAppBrowser()) {
+        const result = await shareFile(file);
+        if (result !== "failed") return;
+      }
+      setPreview({ url: URL.createObjectURL(blob), file });
     } catch (e) {
       console.error(e);
       alert("이미지 저장에 실패했어요.");
@@ -342,6 +410,47 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
           </button>
         ))}
       </div>
+
+      {/* 길게 눌러 저장 미리보기 (인앱 브라우저 등) */}
+      {preview && (
+        <div
+          onClick={closePreview}
+          style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 16, padding: 24,
+          }}
+        >
+          <p style={{ color: "#fff", fontSize: 17, textAlign: "center", lineHeight: 1.5 }}>
+            사진을 길게 눌러 저장해 주세요 📸
+          </p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview.url}
+            alt="포토카드"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 8, WebkitTouchCallout: "default" }}
+          />
+          <div style={{ display: "flex", gap: 10 }} onClick={(e) => e.stopPropagation()}>
+            {typeof navigator !== "undefined" && navigator.canShare?.({ files: [preview.file] }) && (
+              <button
+                onClick={() => shareFile(preview.file)}
+                style={{ padding: "10px 20px", background: "#fff", border: "none", borderRadius: 8, fontSize: 16, cursor: "pointer" }}
+              >
+                공유 / 저장
+              </button>
+            )}
+            <button
+              onClick={closePreview}
+              style={{ padding: "10px 20px", background: "transparent", color: "#fff", border: "1.5px solid #fff", borderRadius: 8, fontSize: 16, cursor: "pointer" }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
