@@ -1,4 +1,7 @@
-.vscode/mcp.json
-.env.local
 node_modules/
 .next/
+.vercel
+.env*
+*.tsbuildinfo
+.DS_Store
+.vscode/mcp.json

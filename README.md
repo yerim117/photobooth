@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 2컷 포토부스
 
-## Getting Started
+2컷 사진을 찍고 메시지를 담아 포토카드로 저장하거나 링크로 공유하는 웹 포토부스입니다.
 
-First, run the development server:
+- 배포: https://photobooth-yr.vercel.app
+- 스택: Next.js (App Router), React, Vercel Blob
+
+## 흐름
+
+1. **Intro** — 받는 사람 / 메시지 / 보내는 사람 입력
+2. **Capture** — 카운트다운 후 2컷 촬영
+3. **Printing** — 출력 연출
+4. **PhotoCard** — 포토카드 저장, 공유 링크 생성
+
+## 공유 링크
+
+사진을 압축해 Vercel Blob(private)에 JSON으로 저장하고 `/share/[id]` 링크로 공유합니다.
+예전 방식의 `/share#<압축 데이터>` 링크도 계속 열립니다.
+
+## 로컬 실행
 
 ```bash
+npm install
+vercel env pull .env.local   # BLOB_READ_WRITE_TOKEN
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| 환경변수 | 설명 |
+|---|---|
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob 스토어 토큰 (스토어 연결 시 자동 생성) |
+| `BLOB_ACCESS` | 선택. public 스토어를 쓸 때만 `public` |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 구조
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+app/
+  page.tsx                 화면 단계(intro → shooting → printing → reveal) 전환
+  components/              화면 및 UI 컴포넌트
+  api/share/route.ts       공유 데이터 업로드 → ID 발급
+  share/[id]/page.tsx      공유 카드 보기
+  share/page.tsx           예전 해시 링크 호환
+  lib/share.ts             공유 데이터 타입·검증
+  lib/browser.ts           사진 압축, 다운로드, 공유 시트 등 브라우저 유틸
+```

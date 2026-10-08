@@ -6,11 +6,21 @@ type Phase = "init" | "ready" | "countdown" | "flash" | "pause" | "done";
 
 interface CaptureScreenProps {
   onComplete: (photos: string[]) => void;
+  onCancel: () => void;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
+const centerOverlay: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 20,
+};
+
+export default function CaptureScreen({ onComplete, onCancel }: CaptureScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shootingStarted = useRef(false);
@@ -23,32 +33,46 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
 
   // 카메라 초기화
   useEffect(() => {
-    let stream: MediaStream;
+    let stream: MediaStream | undefined;
+    let cancelled = false;
     (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        const s = await navigator.mediaDevices.getUserMedia({
           video: { width: 1280, height: 960, facingMode: "user" },
           audio: false,
         });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        // getUserMedia 대기 중 언마운트됐으면 바로 정리 (StrictMode 이중 실행 포함)
+        if (cancelled) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        stream = s;
+        const video = videoRef.current;
+        if (!video) throw new Error("video 없음");
+        video.srcObject = s;
+        if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
           await new Promise<void>((res) => {
-            videoRef.current!.oncanplay = () => res();
+            video.addEventListener("canplay", () => res(), { once: true });
           });
         }
-        setPhase("ready");
+        if (!cancelled) setPhase("ready");
       } catch {
-        setError("카메라 접근 권한이 필요합니다. 브라우저 주소창 옆 카메라 아이콘을 클릭해 허용해주세요.");
+        if (!cancelled) {
+          setError("카메라 접근 권한이 필요합니다. 브라우저 주소창 옆 카메라 아이콘을 클릭해 허용해주세요.");
+        }
       }
     })();
-    return () => stream?.getTracks().forEach((t) => t.stop());
+    return () => {
+      cancelled = true;
+      stream?.getTracks().forEach((t) => t.stop());
+    };
   }, []);
 
   // 사진 캡처 (좌우반전 = 셀카)
   const capturePhoto = useCallback((): string => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return "";
+    if (!video || !canvas || !video.videoWidth) return "";
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d")!;
@@ -60,13 +84,25 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
     return canvas.toDataURL("image/jpeg", 0.92);
   }, []);
 
+  // 언마운트 시 진행 중인 촬영 시퀀스 중단용
+  const unmounted = useRef(false);
+  useEffect(() => {
+    unmounted.current = false;
+    return () => { unmounted.current = true; };
+  }, []);
+
   // 촬영 시퀀스: ready 상태가 되면 자동 시작
   useEffect(() => {
     if (phase !== "ready" || shootingStarted.current) return;
     shootingStarted.current = true;
 
+    const wait = async (ms: number) => {
+      await sleep(ms);
+      if (unmounted.current) throw new Error("unmounted");
+    };
+
     const shoot = async () => {
-      await sleep(1000); // 카메라 안정화 대기
+      await wait(1000); // 카메라 안정화 대기
 
       const photos: string[] = [];
 
@@ -78,28 +114,28 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
         for (let i = 3; i >= 1; i--) {
           setCount(i);
           setCountKey((k) => k + 1);
-          await sleep(950);
+          await wait(950);
         }
 
         // 플래시 → 사진 캡처
         setPhase("flash");
-        await sleep(80);
+        await wait(80);
         photos.push(capturePhoto());
-        await sleep(500);
+        await wait(500);
 
         // 2번째 촬영 전 짧은 브레이크
         if (shot < 1) {
           setPhase("pause");
-          await sleep(1200);
+          await wait(1200);
         }
       }
 
       setPhase("done");
-      await sleep(300);
+      await wait(300);
       onComplete(photos);
     };
 
-    shoot();
+    shoot().catch(() => { /* 언마운트로 중단됨 */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
@@ -107,6 +143,12 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
     return (
       <div style={{ width: "100%", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#000", color: "#fff", gap: 16, padding: 24, textAlign: "center" }}>
         <p style={{ color: "#f87171" }}>{error}</p>
+        <button
+          onClick={onCancel}
+          style={{ padding: "10px 20px", background: "#fff", color: "#000", border: "none", borderRadius: 8, fontSize: 16, cursor: "pointer" }}
+        >
+          돌아가기
+        </button>
       </div>
     );
   }
@@ -136,11 +178,11 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
 
       {/* 카운트다운 숫자 */}
       {phase === "countdown" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20 }}>
+        <div style={centerOverlay}>
           <span
             key={countKey}
             className="count-anim"
-            style={{ fontSize: "clamp(140px, 25vw, 200px)", color: "rgba(247, 173, 209, 0.9)", fontStyle: "italic", lineHeight: 1 }}
+            style={{ fontSize: "clamp(140px, 25vw, 200px)", color: "var(--pink)", fontStyle: "italic", lineHeight: 1 }}
           >
             {count}
           </span>
@@ -149,15 +191,15 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
 
       {/* 준비 중 */}
       {phase === "init" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20 }}>
-          <p style={{ color: "rgba(247, 173, 209, 0.9)", fontSize: 18 }}>Ready...</p>
+        <div style={centerOverlay}>
+          <p style={{ color: "var(--pink)", fontSize: 18 }}>Ready...</p>
         </div>
       )}
 
       {/* 다음 사진 준비 안내 */}
       {phase === "pause" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20 }}>
-          <p style={{ color: "rgba(247, 173, 209, 0.9)", fontSize: 24, fontStyle: "italic" }}>
+        <div style={centerOverlay}>
+          <p style={{ color: "var(--pink)", fontSize: 24, fontStyle: "italic" }}>
             Next!
           </p>
         </div>
@@ -166,7 +208,7 @@ export default function CaptureScreen({ onComplete }: CaptureScreenProps) {
       {/* 촬영 진행 표시 (1/2, 2/2) */}
       {(phase === "countdown" || phase === "pause") && (
         <div style={{ position: "absolute", top: 24, left: 0, right: 0, display: "flex", justifyContent: "center", zIndex: 20 }}>
-          <span style={{ color: "rgba(247, 173, 209, 0.9)", fontSize: 14, letterSpacing: "0.2em" }}>
+          <span style={{ color: "var(--pink)", fontSize: 14, letterSpacing: "0.2em" }}>
             {shotIndex + 1} / 2
           </span>
         </div>

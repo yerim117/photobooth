@@ -1,273 +1,154 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas";
-import LZString from "lz-string";
-import Background from "./Background";
+import CardStack, { type CardFace } from "./CardStack";
+import SavePreview from "./SavePreview";
+import Screen from "./Screen";
+import type { ShareData } from "../lib/share";
+import {
+  canvasToBlob,
+  compressPhoto,
+  copyWithExecCommand,
+  downloadBlob,
+  isInAppBrowser,
+  isIOS,
+  shareWithSheet,
+} from "../lib/browser";
 
-interface PhotoCardProps {
-  photos: string[];
-  to: string;
-  message: string;
-  senderName: string;
+interface PhotoCardProps extends ShareData {
   onRetake: () => void;
 }
 
-export default function PhotoCard({ photos, to, message, senderName, onRetake }: PhotoCardProps) {
-  const [sharing, setSharing] = useState(false);
-  const [front, setFront] = useState<"photo" | "letter">("photo");
-  const captureWrapperRef = useRef<HTMLDivElement>(null);
+const FILE_NAME = "photocard.png";
 
-  // ── 포토카드 디자인 그대로 캡처 (래퍼 기준으로 캡처해 회전 잘림 방지)
-  const captureCard = useCallback(async (): Promise<HTMLCanvasElement> => {
-    if (!captureWrapperRef.current) throw new Error("ref 없음");
-    return await html2canvas(captureWrapperRef.current, {
+export default function PhotoCard({ onRetake, ...data }: PhotoCardProps) {
+  const { photos, to, message, senderName } = data;
+  const [front, setFront] = useState<CardFace>("photo");
+  const captureRef = useRef<HTMLDivElement>(null);
+
+  // ── 포토카드 디자인 그대로 캡처 (회전된 카드가 잘리지 않도록 padding 있는 래퍼 기준)
+  const captureCard = useCallback(async (): Promise<Blob> => {
+    if (!captureRef.current) throw new Error("ref 없음");
+    const canvas = await html2canvas(captureRef.current, {
       backgroundColor: "#FAF5E4",
       scale: 2,
       useCORS: true,
-      allowTaint: true,
       logging: false,
     });
+    return canvasToBlob(canvas);
   }, []);
 
-  // ── 사진 압축 (URL 공유용)
-  const compressPhoto = (dataUrl: string): Promise<string> =>
-    new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 480;
-        let w = img.width, h = img.height;
-        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-        const c = document.createElement("canvas");
-        c.width = w; c.height = h;
-        c.getContext("2d")!.drawImage(img, 0, 0, w, h);
-        resolve(c.toDataURL("image/jpeg", 0.45));
-      };
-      img.src = dataUrl;
-    });
+  // ── 링크 공유 (2단계)
+  // 모바일 브라우저는 탭 직후에만 공유·클립보드 API를 허용하므로
+  // 첫 탭에서 업로드해 링크를 만들고, 두 번째 탭에서 공유 시트/복사를 실행
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  // ── 링크 공유
-  const [linking, setLinking] = useState(false);
-  const shareLink = async () => {
-    setLinking(true);
+  const createLink = async () => {
+    setUploading(true);
     try {
-      const compressed = await Promise.all(photos.map(compressPhoto));
-      const payload = JSON.stringify({ photos: compressed, to, message, senderName });
-      const encoded = LZString.compressToEncodedURIComponent(payload);
-      const url = `${window.location.origin}/share/#${encoded}`;
-      await navigator.clipboard.writeText(url);
-      alert("링크가 복사됐어요! 원하는 곳에 붙여넣기 해주세요 🔗");
+      const compressed = await Promise.all(photos.filter(Boolean).map(compressPhoto));
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos: compressed, to, message, senderName }),
+      });
+      if (!res.ok) throw new Error(`share API ${res.status}`);
+      const { id } = (await res.json()) as { id: string };
+      setShareUrl(`${window.location.origin}/share/${id}`);
     } catch (e) {
       console.error(e);
-      alert("링크 생성에 실패했어요.");
+      alert("링크 생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
-      setLinking(false);
+      setUploading(false);
     }
   };
 
-  // ── 저장하기
-  const downloadStrip = async () => {
-    const canvas = await captureCard();
-    const link = document.createElement("a");
-    link.download = "photocard.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  };
+  const sendLink = async (url: string) => {
+    const result = await shareWithSheet({ title: "포토카드가 도착했어요 💌", url });
+    if (result !== "failed") return;
 
-  // ── 공유하기 (3단계 폴백)
-  const shareStrip = async () => {
-    setSharing(true);
+    if (copyWithExecCommand(url)) {
+      alert("링크가 복사됐어요! 원하는 곳에 붙여넣기 해주세요 🔗");
+      return;
+    }
     try {
-      const canvas = await captureCard();
-      const blob = await new Promise<Blob>((res) =>
-        canvas.toBlob((b) => res(b!), "image/png")
-      );
-      const file = new File([blob], "photocard.png", { type: "image/png" });
-
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] });
-        return;
-      }
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blob }),
-      ]);
-      alert("이미지가 클립보드에 복사됐어요!\n원하는 곳에 붙여넣기 해주세요 🔗");
+      await navigator.clipboard.writeText(url);
+      alert("링크가 복사됐어요! 원하는 곳에 붙여넣기 해주세요 🔗");
     } catch {
-      const canvas = await captureCard();
-      const link = document.createElement("a");
-      link.download = "photocard.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } finally {
-      setSharing(false);
+      window.prompt("아래 링크를 복사해 주세요 🔗", url);
     }
   };
+
+  // ── 사진 저장
+  // iOS는 공유 시트("이미지 저장")를 탭 직후에만 띄울 수 있어서 카드 이미지를 미리 만들어 둠
+  // (카드를 뒤집으면 전환 애니메이션 0.4s가 끝난 뒤 다시 생성)
+  const preparedRef = useRef<{ front: CardFace; blob: Blob } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const blob = await captureCard();
+        if (!cancelled) preparedRef.current = { front, blob };
+      } catch (e) {
+        console.error(e);
+      }
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [front, captureCard]);
+
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<{ url: string; file: File } | null>(null);
+
+  const closePreview = () => {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+  };
+
+  const savePhoto = async () => {
+    setSaving(true);
+    try {
+      const prepared = preparedRef.current;
+      const blob = prepared?.front === front ? prepared.blob : await captureCard();
+      const file = new File([blob], FILE_NAME, { type: "image/png" });
+      const showPreview = () => setPreview({ url: URL.createObjectURL(blob), file });
+
+      if (isInAppBrowser()) {
+        showPreview(); // 다운로드·파일 공유가 막혀 있음
+      } else if (isIOS()) {
+        if ((await shareWithSheet({ files: [file] })) === "failed") showPreview();
+      } else {
+        downloadBlob(blob, FILE_NAME); // PC·Android
+      }
+    } catch (e) {
+      console.error(e);
+      alert("이미지 저장에 실패했어요.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const buttons = [
+    { key: "save", label: saving ? "저장 중…" : "save photo", onClick: savePhoto, disabled: saving },
+    {
+      key: "link",
+      label: uploading ? "🔗 링크 만드는 중…" : shareUrl ? "📤 링크 보내기" : "share link",
+      onClick: () => (shareUrl ? sendLink(shareUrl) : createLink()),
+      disabled: uploading,
+    },
+    { key: "retake", label: "retake photo", onClick: onRetake, disabled: false },
+  ];
 
   return (
-    <div
-      style={{
-        width: "100%",
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 32,
-        padding: "40px 24px",
-        position: "relative",
-      }}
-    >
-      <Background />
-
-      {/* 캡처 래퍼 — 회전된 카드가 잘리지 않도록 충분한 padding 확보 */}
-      <div ref={captureWrapperRef} style={{ padding: "60px 70px", position: "relative" }}>
-      {/* 카드 두 장 겹침 컨테이너 */}
-      {/* 페이퍼 카드(landscape) 위, 사진 스트립 아래에서 포개짐 */}
-      <div style={{ position: "relative", width: 330, height: 620 }}>
-
-        {/* 메시지 카드 — 가로형(landscape) 324:247 비율, 위쪽에 -10deg */}
-        <div
-          onClick={() => setFront("letter")}
-          style={{
-            position: "absolute",
-            top: 20,
-            left: 5,
-            width: 318,
-            height: 243,   /* 318 × (247/324) ≈ 243 */
-            backgroundImage: "url('/papercard2.png')",
-            backgroundSize: "170%",
-            backgroundPosition: "50% 70%",
-            borderRadius: 10,
-            padding: "16px 18px 14px",
-            transform: front === "letter"
-              ? "rotate(-7deg) scale(1.05)"
-              : "rotate(-10deg) scale(1)",
-            transformOrigin: "center center",
-            zIndex: front === "letter" ? 4 : 1,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            boxShadow: front === "letter"
-              ? "0 10px 30px rgba(0,0,0,0.20)"
-              : "0 3px 14px rgba(0,0,0,0.12)",
-            cursor: front === "letter" ? "default" : "pointer",
-            transition: "transform 0.4s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.4s ease",
-          }}
-        >
-          {to && (
-            <p
-              style={{
-                fontSize: 19,
-                color: "#342323",
-              }}
-            >
-              To. {to}
-            </p>
-          )}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <p
-              style={{
-                fontSize: 19,
-                color: "rgba(247, 173, 209, 0.9)",
-                lineHeight: 1.7,
-                whiteSpace: "pre-wrap",
-                textAlign: "center",
-              }}
-            >
-              {message || "메시지가 없어요."}
-            </p>
-          </div>
-          {senderName && (
-            <p
-              style={{
-                fontSize: 17,
-                color: "#342323",
-                textAlign: "right",
-                width: "100%",
-              }}
-            >
-              From. {senderName}
-            </p>
-          )}
-        </div>
-
-        {/* 사진 스트립 — 페이퍼 카드 위에 포개져서 아래로, +4deg */}
-        <div
-          onClick={() => setFront("photo")}
-          style={{
-            position: "absolute",
-            top: 100,
-            left: 8,
-            width: 285,
-            backgroundImage: "url('/photocard-color.JPG')",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            borderRadius: 10,
-            padding: "12px 12px 8px",
-            transform: front === "photo"
-              ? "rotate(4deg) scale(1.03)"
-              : "rotate(6deg) scale(1)",
-            transformOrigin: "top center",
-            zIndex: front === "photo" ? 4 : 3,
-            boxShadow: front === "photo"
-              ? "0 10px 30px rgba(0,0,0,0.20)"
-              : "0 4px 16px rgba(0,0,0,0.13)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            cursor: front === "photo" ? "default" : "pointer",
-            transition: "transform 0.4s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.4s ease",
-          }}
-        >
-          {[0, 1].map((i) => (
-            <div
-              key={i}
-              style={{
-                height: 190,
-                background: "#f0f0f0",
-                borderRadius: 6,
-                overflow: "hidden",
-              }}
-            >
-              {photos[i] ? (
-                <img
-                  src={photos[i]}
-                  alt={`photo ${i + 1}`}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#bbb",
-                    fontSize: 12,
-                  }}
-                >
-                  photo {i + 1}
-                </div>
-              )}
-            </div>
-          ))}
-
-          <p
-            style={{
-              fontSize: 24,
-              color: "rgba(247, 173, 209, 0.9)",
-              textAlign: "center",
-              padding: "2px 0 4px",
-            }}
-          >
-            ✨ To You ✨
-          </p>
-        </div>
+    <Screen gap={32} padding="40px 24px">
+      <div ref={captureRef} style={{ padding: "60px 70px", position: "relative" }}>
+        <CardStack data={data} front={front} onFlip={setFront} />
       </div>
-      </div>{/* captureWrapperRef 끝 */}
 
-      {/* 버튼 행 */}
       <div
         style={{
           display: "flex",
@@ -278,22 +159,18 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
           justifyContent: "center",
         }}
       >
-        {[
-          { label: "save photo", onClick: downloadStrip, disabled: false },
-          { label: linking ? "🔗 링크 생성 중…" : "share link", onClick: shareLink, disabled: linking },
-          { label: "retake photo", onClick: onRetake, disabled: false },
-        ].map(({ label, onClick, disabled }) => (
+        {buttons.map(({ key, label, onClick, disabled }) => (
           <button
-            key={label}
+            key={key}
             onClick={onClick}
             disabled={disabled}
             style={{
               padding: "10px 20px",
-              background: "var(--white)",
-              border: "1.5px solid var(--card-bg)",
+              background: "#fff",
+              border: "1.5px solid var(--pink)",
               borderRadius: 8,
               fontSize: 16,
-              color: "rgba(247, 173, 209, 0.9)",
+              color: "var(--pink)",
               cursor: disabled ? "not-allowed" : "pointer",
               opacity: disabled ? 0.6 : 1,
               boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
@@ -303,6 +180,8 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
           </button>
         ))}
       </div>
-    </div>
+
+      {preview && <SavePreview url={preview.url} file={preview.file} onClose={closePreview} />}
+    </Screen>
   );
 }

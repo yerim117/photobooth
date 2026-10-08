@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import IntroScreen from "./components/IntroScreen";
 import CaptureScreen from "./components/CaptureScreen";
 import PrintingScreen from "./components/PrintingScreen";
@@ -32,16 +32,19 @@ export default function Home() {
     setState("intro");
   };
 
+  // PrintingScreen의 useEffect 의존성 — 매 렌더마다 새 함수면 타이머가 리셋됨
+  const handlePrintDone = useCallback(() => setState("reveal"), []);
+
   return (
     <main style={{ width: "100%", minHeight: "100vh", overflow: "hidden" }}>
       {state === "intro" && <IntroScreen onStart={handleStart} />}
 
       {state === "shooting" && (
-        <CaptureScreen onComplete={(captured) => handlePhotosComplete(captured)} />
+        <CaptureScreen onComplete={handlePhotosComplete} onCancel={handleRetake} />
       )}
 
       {state === "printing" && (
-        <PrintingScreen photos={photos} onDone={() => setState("reveal")} />
+        <PrintingScreen photos={photos} onDone={handlePrintDone} />
       )}
 
       {state === "reveal" && (
