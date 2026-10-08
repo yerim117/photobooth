@@ -1,44 +1,24 @@
 "use client";
 
 import { useEffect } from "react";
-import Background from "./Background";
+import Screen from "./Screen";
 
 interface PrintingScreenProps {
   photos: string[];
   onDone: () => void;
 }
 
+const PRINT_DURATION_MS = 2500;
+
 export default function PrintingScreen({ photos, onDone }: PrintingScreenProps) {
-  // 2.5초 후 자동으로 다음 화면으로
   useEffect(() => {
-    const t = setTimeout(onDone, 2500);
+    const t = setTimeout(onDone, PRINT_DURATION_MS);
     return () => clearTimeout(t);
   }, [onDone]);
 
   return (
-    <div
-      style={{
-        width: "100%",
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 24,
-        position: "relative",
-      }}
-    >
-      <Background />
-
-      <p
-        style={{
-          fontSize: 34,
-          color: "rgba(247, 173, 209, 0.9)",
-          zIndex: 1,
-        }}
-      >
-        now printing...
-      </p>
+    <Screen padding={0}>
+      <p style={{ fontSize: 34, color: "var(--pink)" }}>now printing...</p>
 
       {/* 사진 2컷 미리보기 */}
       <div
@@ -46,26 +26,17 @@ export default function PrintingScreen({ photos, onDone }: PrintingScreenProps) 
           display: "flex",
           flexDirection: "column",
           gap: 8,
-          border: "6px solid rgba(247, 173, 209, 0.9)",
+          border: "6px solid var(--pink)",
           padding: 12,
           borderRadius: 8,
           background: "#f5ebbf",
-          zIndex: 1,
           boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
         }}
       >
         {[0, 1].map((i) => (
-          <div
-            key={i}
-            style={{
-              width: 160,
-              height: 120,
-              background: "#f0f0f0",
-              borderRadius: 4,
-              overflow: "hidden",
-            }}
-          >
+          <div key={i} style={{ width: 160, height: 120, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}>
             {photos[i] && (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL이라 next/image 최적화 불가
               <img
                 src={photos[i]}
                 alt={`photo ${i + 1}`}
@@ -75,6 +46,6 @@ export default function PrintingScreen({ photos, onDone }: PrintingScreenProps) 
           </div>
         ))}
       </div>
-    </div>
+    </Screen>
   );
 }

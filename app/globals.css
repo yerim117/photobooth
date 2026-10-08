@@ -7,40 +7,21 @@
 }
 
 :root {
-  --red:      #C84040;
-  --white:    #ffffff;
-  --gold:     #EDD98A;
-  --card-bg:  rgba(247, 173, 209, 0.9);
-  --msg-bg:   #E8E4DC;
-  --underline: #666;
+  --pink:  rgba(247, 173, 209, 0.9); /* 포인트 컬러 */
+  --brown: #4B2E2B;                  /* 입력 폼 텍스트 */
+  --ink:   #342323;                  /* 카드 To/From */
 }
 
-/* ── CSS 별 ── */
-.star {
-  position: absolute;
-  background: #EDD56A;
-  clip-path: polygon(
-    50% 0%,
-    61% 35%,
-    98% 35%,
-    68% 57%,
-    79% 91%,
-    50% 70%,
-    21% 91%,
-    32% 57%,
-    2%  35%,
-    39% 35%
-  );
-  opacity: 0.85;
+input,
+textarea,
+button {
+  font-family: inherit;
 }
 
-/* ── placeholder 커시브 스타일 ── */
-.cursive-input::placeholder {
-  color: #ffffff !important;
+input::placeholder,
+textarea::placeholder {
+  color: #ffffff;
   opacity: 1;
-}
-.cursive-input {
-  color: var(--red);
 }
 
 /* ── 카운트다운 숫자 ── */
@@ -58,20 +39,3 @@
   100%     { opacity: 0; }
 }
 .flash-anim { animation: flashOut 0.5s ease-out forwards; }
-
-input::placeholder,
-textarea::placeholder {
-  color: #ffffff !important;
-}
-
-html, body {
-  font-family: inherit;
-}
-
-input,
-textarea,
-button {
-  font-family: inherit;
-}
-
-
