@@ -53,8 +53,8 @@ const copyWithExecCommand = (text: string): boolean => {
 };
 
 // ── 환경 감지 (사진 저장 방식 선택용)
-const isMobile = () =>
-  /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+const isIOS = () =>
+  /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPadOS
 
 // 카카오톡·인스타그램 등 인앱 브라우저는 다운로드/파일 공유를 막는 경우가 많음
@@ -191,17 +191,21 @@ export default function PhotoCard({ photos, to, message, senderName, onRetake }:
       const blob = ready ?? (await canvasToBlob(await captureCard()));
       const file = new File([blob], "photocard.png", { type: "image/png" });
 
-      if (!isMobile()) {
-        downloadBlob(blob, "photocard.png");
+      // 인앱 브라우저: 다운로드·파일 공유가 막혀 있어 길게 눌러 저장 안내
+      if (isInAppBrowser()) {
+        setPreview({ url: URL.createObjectURL(blob), file });
         return;
       }
 
-      // 모바일: 공유 시트 → 실패 시 길게 눌러 저장 안내
-      if (!isInAppBrowser()) {
+      // iOS: 다운로드 대신 공유 시트의 "이미지 저장" 사용 → 실패 시 길게 눌러 저장 안내
+      if (isIOS()) {
         const result = await shareFile(file);
-        if (result !== "failed") return;
+        if (result === "failed") setPreview({ url: URL.createObjectURL(blob), file });
+        return;
       }
-      setPreview({ url: URL.createObjectURL(blob), file });
+
+      // PC·Android 브라우저: 바로 다운로드
+      downloadBlob(blob, "photocard.png");
     } catch (e) {
       console.error(e);
       alert("이미지 저장에 실패했어요.");
