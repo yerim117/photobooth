@@ -28,7 +28,7 @@ export default function CardStack({ data, front, onFlip }: CardStackProps) {
           left: 5,
           width: 318,
           height: 243,
-          backgroundImage: "url('/paper-card.jpg')",
+          backgroundImage: "url('/paper_card.jpg')",
           backgroundSize: "170%",
           backgroundPosition: "50% 70%",
           borderRadius: 10,

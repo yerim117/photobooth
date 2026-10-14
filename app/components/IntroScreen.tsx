@@ -66,7 +66,7 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
       <div
         style={{
           width: 340,
-          backgroundImage: "url('/paper-card.jpg')",
+          backgroundImage: "url('/paper_card.jpg')",
           backgroundSize: "120%",
           backgroundPosition: "center",
           borderRadius: 12,
