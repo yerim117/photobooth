@@ -1,21 +1,9 @@
 @import "tailwindcss";
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 :root {
   --pink:  rgba(247, 173, 209, 0.9); /* 포인트 컬러 */
   --brown: #4B2E2B;                  /* 입력 폼 텍스트 */
   --ink:   #342323;                  /* 카드 To/From */
-}
-
-input,
-textarea,
-button {
-  font-family: inherit;
 }
 
 input::placeholder,
