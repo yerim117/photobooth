@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import CardStack, { type CardFace } from "./CardStack";
 import SavePreview from "./SavePreview";
-import Screen from "./Screen";
+import Screen, { SCREEN_BG_STYLE } from "./Screen";
 import type { ShareData } from "../lib/share";
 import {
   canvasToBlob,
@@ -28,13 +28,20 @@ export default function PhotoCard({ onRetake, ...data }: PhotoCardProps) {
   const captureRef = useRef<HTMLDivElement>(null);
 
   // ── 포토카드 디자인 그대로 캡처 (회전된 카드가 잘리지 않도록 padding 있는 래퍼 기준)
+  // 화면 배경(Screen)은 래퍼 밖의 fixed 레이어라 캡처에 포함되지 않으므로,
+  // 캡처용 복제본에만 같은 배경을 넣음 (실제 화면에 넣으면 배경이 두 겹으로 겹쳐 보임)
   const captureCard = useCallback(async (): Promise<Blob> => {
     if (!captureRef.current) throw new Error("ref 없음");
     const canvas = await html2canvas(captureRef.current, {
-      backgroundColor: "#FAF5E4",
+      backgroundColor: "#ffffff",
       scale: 2,
       useCORS: true,
       logging: false,
+      onclone: (doc, el) => {
+        const bg = doc.createElement("div");
+        Object.assign(bg.style, SCREEN_BG_STYLE, { position: "absolute", zIndex: "auto" });
+        el.prepend(bg);
+      },
     });
     return canvasToBlob(canvas);
   }, []);
