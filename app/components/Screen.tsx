@@ -11,7 +11,7 @@ export const SCREEN_BG_STYLE: React.CSSProperties = {
   position: "fixed",
   inset: 0,
   zIndex: -1,
-  backgroundImage: "url('/bg.jpg')",
+  backgroundImage: "url('/background.jpg')",
   backgroundSize: "cover",
   backgroundPosition: "center",
   opacity: 0.4,

@@ -71,7 +71,7 @@ export default function CardStack({ data, front, onFlip }: CardStackProps) {
           top: 100,
           left: 8,
           width: 285,
-          backgroundImage: "url('/photocard-color.JPG')",
+          backgroundImage: "url('/photo_card.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
           borderRadius: 10,
